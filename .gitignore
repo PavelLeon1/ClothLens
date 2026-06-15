@@ -1,0 +1,43 @@
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Datasets, checkpoints, and generated artifacts
+data/
+models/
+checkpoints/
+results/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# AI assistant context and planning files
+AGENT.md
+AGENTS.md
+.agents/
+.codex/
+docs/superpowers/
+clothing-search-system.md

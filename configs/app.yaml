@@ -1,0 +1,8 @@
+segmentation:
+  backend: segformer
+  model_name: mattmdjaga/segformer_b2_clothes
+  checkpoint_path: null
+
+search:
+  collection_name: clothing_catalog
+  top_k: 10
