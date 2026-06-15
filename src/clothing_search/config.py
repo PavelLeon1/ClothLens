@@ -19,14 +19,23 @@ class SegmentationConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EmbeddingConfig:
+    model_name: str = "patrickjohncyh/fashion-clip"
+    batch_size: int = 32
+
+
+@dataclass(frozen=True, slots=True)
 class SearchConfig:
     collection_name: str = "clothing_catalog"
+    path: str = "data/qdrant"
+    vector_size: int = 512
     top_k: int = 10
 
 
 @dataclass(frozen=True, slots=True)
 class AppConfig:
     segmentation: SegmentationConfig
+    embedding: EmbeddingConfig
     search: SearchConfig
 
 
@@ -109,6 +118,7 @@ def load_app_config(path: str | Path) -> AppConfig:
 
     return AppConfig(
         segmentation=segmentation,
+        embedding=_build_section(EmbeddingConfig, payload.get("embedding")),
         search=_build_section(SearchConfig, payload.get("search")),
     )
 

@@ -63,3 +63,52 @@ python -m clothing_search.segmentation.train --config configs/train.yaml
 DeepFashion2 содержит категории `top`, `bottom`, `dress` и `outerwear`, но не
 содержит разметку обуви, сумок и аксессуаров. Поэтому будущие метрики U-Net на
 этом датасете будут рассчитываться только для представленных классов.
+
+## Рабочий поиск
+
+Текущий pipeline использует:
+
+- `mattmdjaga/segformer_b2_clothes` для готовой сегментации;
+- `patrickjohncyh/fashion-clip` для 512-мерных эмбеддингов;
+- Qdrant в persistent local mode, без Docker и отдельного сервера.
+
+Установка поисковых зависимостей выполняется только внутри `venv`:
+
+```powershell
+python -m pip install -e ".[search]"
+```
+
+Каталог имеет следующую структуру:
+
+```text
+data/catalog/
+├── images/
+│   ├── sku-001.jpg
+│   └── sku-002.jpg
+└── metadata.json
+```
+
+Пример `metadata.json`:
+
+```json
+[
+  {
+    "item_id": "sku-001",
+    "category": "top",
+    "brand": "Example",
+    "color": "blue",
+    "price": 3990,
+    "image_url": "https://example.test/sku-001.jpg"
+  }
+]
+```
+
+Построение локального индекса:
+
+```powershell
+python scripts/build_index.py --catalog data/catalog
+```
+
+Индекс сохраняется в `data/qdrant`, который исключён из Git. При первом
+использовании Transformers загрузит веса моделей в пользовательский кэш
+Hugging Face; сами веса также не добавляются в репозиторий.

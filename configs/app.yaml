@@ -3,6 +3,12 @@ segmentation:
   model_name: mattmdjaga/segformer_b2_clothes
   checkpoint_path: null
 
+embedding:
+  model_name: patrickjohncyh/fashion-clip
+  batch_size: 32
+
 search:
   collection_name: clothing_catalog
+  path: data/qdrant
+  vector_size: 512
   top_k: 10

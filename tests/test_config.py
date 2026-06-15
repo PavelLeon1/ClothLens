@@ -10,7 +10,12 @@ def test_load_app_config_selects_segformer_backend(tmp_path: Path) -> None:
     path.write_text(
         "segmentation:\n"
         "  backend: segformer\n"
-        "  model_name: example/model\n",
+        "  model_name: example/model\n"
+        "embedding:\n"
+        "  model_name: example/clip\n"
+        "search:\n"
+        "  path: example/qdrant\n"
+        "  vector_size: 256\n",
         encoding="utf-8",
     )
 
@@ -18,6 +23,9 @@ def test_load_app_config_selects_segformer_backend(tmp_path: Path) -> None:
 
     assert config.segmentation.backend == "segformer"
     assert config.segmentation.model_name == "example/model"
+    assert config.embedding.model_name == "example/clip"
+    assert config.search.path == "example/qdrant"
+    assert config.search.vector_size == 256
 
 
 def test_load_app_config_rejects_unknown_backend(tmp_path: Path) -> None:

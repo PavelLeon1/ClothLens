@@ -30,8 +30,11 @@ ml = [
     "torchvision>=0.22",
 ]
 search = [
-    "qdrant-client>=1.14",
-    "transformers>=4.50",
+    "qdrant-client>=1.18,<2",
+    "safetensors>=0.5",
+    "torch>=2.7",
+    "torchvision>=0.22",
+    "transformers>=4.50,<5",
 ]
 api = [
     "fastapi>=0.115",
