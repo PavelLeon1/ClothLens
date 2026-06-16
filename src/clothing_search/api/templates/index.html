@@ -18,6 +18,7 @@
       </section>
 
       <section class="panel">
+        <h2>Search Similar Clothes</h2>
         <form id="search-form">
           <label>
             Photo
@@ -38,6 +39,47 @@
           <button type="submit">Search Similar Clothes</button>
         </form>
         <p id="status" role="status"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Add Images To Catalog</h2>
+        <p class="hint">
+          Select one category and upload one or several product photos. ClothLens
+          will save them, generate item IDs, and index embeddings automatically.
+        </p>
+        <form id="catalog-form">
+          <label>
+            Catalog photos
+            <input name="catalog_files" type="file" accept="image/*" multiple required>
+          </label>
+          <label>
+            Category
+            <select name="category">
+              {% for category in categories %}
+              <option value="{{ category }}">{{ category }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Brand
+            <input name="brand" type="text" placeholder="optional">
+          </label>
+          <label>
+            Color
+            <input name="color" type="text" placeholder="optional">
+          </label>
+          <label>
+            Price
+            <input name="price" type="number" min="0" step="0.01" placeholder="optional">
+          </label>
+          <label>
+            ID prefix
+            <input name="item_id_prefix" type="text" placeholder="auto from filename">
+          </label>
+          <button type="submit">Save And Index</button>
+        </form>
+        <p id="catalog-status" role="status"></p>
+        <ul id="catalog-log" class="catalog-log" aria-label="Catalog upload log"></ul>
       </section>
 
       <section class="preview-grid" aria-label="Segmentation preview">

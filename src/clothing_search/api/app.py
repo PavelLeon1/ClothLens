@@ -115,6 +115,11 @@ def create_app(
         StaticFiles(directory=str(API_DIR / "static")),
         name="static",
     )
+    app.mount(
+        "/catalog-images",
+        StaticFiles(directory=str(app.state.catalog_dir / "images"), check_dir=False),
+        name="catalog-images",
+    )
 
     @app.get("/")
     def index(request: Request) -> Any:
@@ -181,11 +186,12 @@ def create_app(
             "item_id": safe_item_id,
             "category": resolved_category,
         }
+        effective_image_url = image_url or f"/catalog-images/{safe_item_id}.jpg"
         optional_fields = {
             "brand": brand,
             "color": color,
             "price": price,
-            "image_url": image_url,
+            "image_url": effective_image_url,
         }
         metadata.update(
             {

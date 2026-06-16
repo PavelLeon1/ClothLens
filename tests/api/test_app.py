@@ -219,6 +219,31 @@ def test_catalog_add_saves_image_and_indexes_metadata(tmp_path: Path) -> None:
     ]
 
 
+def test_catalog_add_uses_local_image_url_when_missing(tmp_path: Path) -> None:
+    client, _ = make_client(tmp_path)
+
+    response = client.post(
+        "/catalog/add",
+        files={"file": ("catalog.png", image_bytes(), "image/png")},
+        data={"item_id": "sku-2", "category": "top"},
+    )
+
+    assert response.status_code == 200
+    metadata_payload = json.loads((tmp_path / "metadata.json").read_text())
+    assert metadata_payload == [
+        {
+            "item_id": "sku-2",
+            "category": "top",
+            "image_url": "/catalog-images/sku-2.jpg",
+        }
+    ]
+
+    image_response = client.get("/catalog-images/sku-2.jpg")
+
+    assert image_response.status_code == 200
+    assert image_response.headers["content-type"] == "image/jpeg"
+
+
 def test_catalog_add_rejects_unsafe_item_id(tmp_path: Path) -> None:
     client, _ = make_client(tmp_path)
 
@@ -239,8 +264,13 @@ def test_index_page_renders_upload_form(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert "ClothLens" in response.text
+    assert 'id="search-form"' in response.text
     assert 'name="file"' in response.text
     assert 'name="category"' in response.text
+    assert 'id="catalog-form"' in response.text
+    assert 'name="catalog_files"' in response.text
+    assert 'multiple' in response.text
+    assert 'id="catalog-status"' in response.text
     assert 'id="results"' in response.text
 
 
@@ -252,6 +282,8 @@ def test_static_assets_are_served(tmp_path: Path) -> None:
 
     assert script.status_code == 200
     assert "fetch('/search'" in script.text
+    assert "fetch('/catalog/add'" in script.text
+    assert "catalog-form" in script.text
     assert styles.status_code == 200
     assert ".result-card" in styles.text
 
