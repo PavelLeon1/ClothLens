@@ -140,9 +140,10 @@ class QueryEvaluation:
     recall_at_k: float
     average_precision_at_k: float
     latency_seconds: float
+    error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "query_id": self.query_id,
             "category": self.category.name.lower(),
             "retrieved_item_ids": list(self.retrieved_item_ids),
@@ -152,6 +153,9 @@ class QueryEvaluation:
             "average_precision_at_k": self.average_precision_at_k,
             "latency_seconds": self.latency_seconds,
         }
+        if self.error is not None:
+            payload["error"] = self.error
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,15 +234,33 @@ def evaluate_search_pipeline(
     for query in queries:
         with Image.open(query.image_path) as source_image:
             image = source_image.convert("RGB").copy()
+        relevant_item_ids = tuple(sorted(query.relevant_item_ids))
         started_at = clock()
-        response = pipeline.search(
-            image,
-            category=query.category,
-            top_k=top_k,
-        )
+        try:
+            response = pipeline.search(
+                image,
+                category=query.category,
+                top_k=top_k,
+            )
+        except (LookupError, ValueError) as error:
+            latency = round(clock() - started_at, 10)
+            query_reports.append(
+                QueryEvaluation(
+                    query_id=query.query_id,
+                    category=query.category,
+                    retrieved_item_ids=(),
+                    relevant_item_ids=relevant_item_ids,
+                    precision_at_k=0.0,
+                    recall_at_k=0.0,
+                    average_precision_at_k=0.0,
+                    latency_seconds=latency,
+                    error=str(error),
+                )
+            )
+            continue
+
         latency = round(clock() - started_at, 10)
         retrieved_item_ids = tuple(result.item_id for result in response.results)
-        relevant_item_ids = tuple(sorted(query.relevant_item_ids))
         query_reports.append(
             QueryEvaluation(
                 query_id=query.query_id,

@@ -10,6 +10,7 @@ from clothing_search.evaluation import (
 )
 from clothing_search.search.models import SearchResult
 from clothing_search.segmentation.categories import ClothingCategory
+from clothing_search.segmentation.crop import CategoryNotFoundError
 
 
 def save_query_image(path: Path) -> None:
@@ -152,3 +153,52 @@ def test_evaluate_search_pipeline_computes_report(tmp_path: Path) -> None:
             },
         ],
     }
+
+
+class FailingPipeline:
+    def search(
+        self,
+        image: Image.Image,
+        *,
+        category: ClothingCategory,
+        top_k: int,
+    ) -> Any:
+        raise CategoryNotFoundError("Clothing category 'shoes' was not found")
+
+
+def test_evaluate_search_pipeline_records_failed_queries(tmp_path: Path) -> None:
+    query_image = tmp_path / "query.jpg"
+    save_query_image(query_image)
+    queries = load_evaluation_queries(
+        tmp_path / "manifest.json",
+        payload=[
+            {
+                "query_id": "q1",
+                "image_path": str(query_image),
+                "category": "shoes",
+                "relevant_item_ids": ["sku-1"],
+            }
+        ],
+    )
+    clock_values = iter([3.0, 3.4])
+
+    report = evaluate_search_pipeline(
+        FailingPipeline(),
+        queries,
+        top_k=2,
+        clock=lambda: next(clock_values),
+    )
+
+    assert report.to_dict()["queries"] == [
+        {
+            "query_id": "q1",
+            "category": "shoes",
+            "retrieved_item_ids": [],
+            "relevant_item_ids": ["sku-1"],
+            "precision_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "average_precision_at_k": 0.0,
+            "latency_seconds": 0.4,
+            "error": "Clothing category 'shoes' was not found",
+        }
+    ]
