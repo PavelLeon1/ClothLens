@@ -141,3 +141,35 @@ python -m clothing_search.api
 - `POST /search` — multipart-загрузка изображения, `category` и `top_k`;
 - `POST /catalog/add` — добавление изображения товара в локальный каталог и
   индекс Qdrant.
+
+## Оценка качества поиска
+
+На текущем этапе оценивается рабочий pipeline с предобученным SegFormer.
+U-Net не обучается и не участвует в сравнении, пока не будет получен checkpoint.
+
+Формат manifest для запросов:
+
+```json
+[
+  {
+    "query_id": "query-001",
+    "image_path": "data/evaluation/query-001.jpg",
+    "category": "top",
+    "relevant_item_ids": ["sku-001", "sku-014"]
+  }
+]
+```
+
+Запуск оценки:
+
+```powershell
+python scripts/evaluate_search.py `
+  --manifest data/evaluation/manifest.json `
+  --config configs/app.yaml `
+  --top-k 10 `
+  --output results/segformer-report.json `
+  --pretty
+```
+
+Отчёт содержит `Precision@K`, `Recall@K`, `mAP@K`, latency summary и
+метрики по каждому query. Папки `data/` и `results/` исключены из Git.
