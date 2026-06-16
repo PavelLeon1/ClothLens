@@ -5,6 +5,8 @@ const catalogStatus = document.querySelector('#catalog-status');
 const catalogLog = document.querySelector('#catalog-log');
 const cropImage = document.querySelector('#crop-image');
 const maskImage = document.querySelector('#mask-image');
+const cropPreviewCard = document.querySelector('#crop-preview-card');
+const maskPreviewCard = document.querySelector('#mask-preview-card');
 const results = document.querySelector('#results');
 
 const CATEGORY_LABELS = {
@@ -78,6 +80,20 @@ function renderResults(items) {
   }
 }
 
+function clearPreview() {
+  cropImage.removeAttribute('src');
+  maskImage.removeAttribute('src');
+  cropPreviewCard.classList.remove('has-image');
+  maskPreviewCard.classList.remove('has-image');
+}
+
+function showPreview(cropImageData, maskImageData) {
+  cropImage.src = cropImageData;
+  maskImage.src = maskImageData;
+  cropPreviewCard.classList.add('has-image');
+  maskPreviewCard.classList.add('has-image');
+}
+
 function setCatalogStatus(message) {
   catalogStatus.textContent = message;
 }
@@ -114,6 +130,7 @@ searchForm.addEventListener('submit', async (event) => {
   const formData = new FormData(searchForm);
   setStatus('Идёт поиск...');
   results.innerHTML = '';
+  clearPreview();
 
   try {
     const response = await fetch('/search', {
@@ -125,8 +142,7 @@ searchForm.addEventListener('submit', async (event) => {
       throw new Error(payload.detail || 'Поиск не выполнен.');
     }
 
-    cropImage.src = payload.crop_image;
-    maskImage.src = payload.mask_image;
+    showPreview(payload.crop_image, payload.mask_image);
     renderResults(payload.results);
     setStatus(`Найдено похожих товаров: ${payload.results.length}.`);
   } catch (error) {

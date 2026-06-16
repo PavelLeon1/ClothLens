@@ -271,13 +271,17 @@ def test_index_page_renders_upload_form(tmp_path: Path) -> None:
     assert "Результаты" in response.text
     assert "Visual clothing search" not in response.text
     assert "Search Similar Clothes" not in response.text
-    assert 'id="search-form"' in response.text
+    assert 'id="search-form" class="form-grid search-form-grid"' in response.text
     assert 'name="file"' in response.text
     assert 'name="category"' in response.text
-    assert 'id="catalog-form"' in response.text
+    assert 'id="catalog-form" class="form-grid catalog-form-grid"' in response.text
     assert 'name="catalog_files"' in response.text
     assert 'multiple' in response.text
     assert 'id="catalog-status"' in response.text
+    assert 'class="form-actions"' in response.text
+    assert 'class="preview-card"' in response.text
+    assert 'class="preview-placeholder"' in response.text
+    assert 'class="preview-image"' in response.text
     assert 'id="results"' in response.text
 
 
@@ -297,6 +301,11 @@ def test_static_assets_are_served(tmp_path: Path) -> None:
     assert "Searching..." not in script.text
     assert "Score:" not in script.text
     assert styles.status_code == 200
+    assert ".form-grid" in styles.text
+    assert ".search-form-grid" in styles.text
+    assert ".catalog-form-grid" in styles.text
+    assert ".preview-card.has-image" in styles.text
+    assert ".preview-placeholder" in styles.text
     assert ".result-card" in styles.text
 
 
