@@ -112,3 +112,32 @@ python scripts/build_index.py --catalog data/catalog
 Индекс сохраняется в `data/qdrant`, который исключён из Git. При первом
 использовании Transformers загрузит веса моделей в пользовательский кэш
 Hugging Face; сами веса также не добавляются в репозиторий.
+
+## FastAPI и web-интерфейс
+
+Для запуска API и простой страницы поиска установите runtime-зависимости в
+локальное окружение:
+
+```powershell
+python -m pip install -e ".[dev,search,api]"
+```
+
+Перед поиском каталог должен быть проиндексирован:
+
+```powershell
+python scripts/build_index.py --catalog data/catalog
+```
+
+Запуск приложения:
+
+```powershell
+python -m clothing_search.api
+```
+
+После запуска страница доступна по адресу `http://127.0.0.1:8000/`.
+Основные endpoints:
+
+- `GET /health` — проверка доступности сервиса;
+- `POST /search` — multipart-загрузка изображения, `category` и `top_k`;
+- `POST /catalog/add` — добавление изображения товара в локальный каталог и
+  индекс Qdrant.
