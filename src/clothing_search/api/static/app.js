@@ -7,8 +7,41 @@ const cropImage = document.querySelector('#crop-image');
 const maskImage = document.querySelector('#mask-image');
 const results = document.querySelector('#results');
 
+const CATEGORY_LABELS = {
+  top: 'верх',
+  bottom: 'низ',
+  dress: 'платье',
+  outerwear: 'верхняя одежда',
+  shoes: 'обувь',
+  bag: 'сумка',
+  accessories: 'аксессуары',
+};
+
 function setStatus(message) {
   statusBox.textContent = message;
+}
+
+function categoryLabel(value) {
+  return CATEGORY_LABELS[value] || value || 'неизвестно';
+}
+
+function friendlyErrorMessage(message) {
+  if (!message) {
+    return 'Произошла ошибка.';
+  }
+  if (message.includes('Uploaded file is not a valid image')) {
+    return 'Загруженный файл не является изображением.';
+  }
+  if (message.includes('Unsupported clothing category')) {
+    return 'Выбрана неподдерживаемая категория одежды.';
+  }
+  if (message.includes('was not found')) {
+    return 'Одежда выбранной категории не найдена на изображении.';
+  }
+  if (message.includes('item_id contains unsupported characters')) {
+    return 'ID товара содержит неподдерживаемые символы.';
+  }
+  return message;
 }
 
 function renderResults(items) {
@@ -21,7 +54,7 @@ function renderResults(items) {
     if (metadata.image_url) {
       const image = document.createElement('img');
       image.src = metadata.image_url;
-      image.alt = `Catalog item ${item.item_id}`;
+      image.alt = `Товар каталога ${item.item_id}`;
       card.appendChild(image);
     }
 
@@ -30,15 +63,15 @@ function renderResults(items) {
     card.appendChild(title);
 
     const score = document.createElement('p');
-    score.textContent = `Score: ${Number(item.score).toFixed(3)}`;
+    score.textContent = `Сходство: ${Number(item.score).toFixed(3)}`;
     card.appendChild(score);
 
     const category = document.createElement('p');
-    category.textContent = `Category: ${metadata.category || 'unknown'}`;
+    category.textContent = `Категория: ${categoryLabel(metadata.category)}`;
     card.appendChild(category);
 
     const brand = document.createElement('p');
-    brand.textContent = `Brand: ${metadata.brand || '-'}`;
+    brand.textContent = `Бренд: ${metadata.brand || '-'}`;
     card.appendChild(brand);
 
     results.appendChild(card);
@@ -79,7 +112,7 @@ function appendCatalogLog(message, isError = false) {
 searchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const formData = new FormData(searchForm);
-  setStatus('Searching...');
+  setStatus('Идёт поиск...');
   results.innerHTML = '';
 
   try {
@@ -89,15 +122,15 @@ searchForm.addEventListener('submit', async (event) => {
     });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.detail || 'Search failed');
+      throw new Error(payload.detail || 'Поиск не выполнен.');
     }
 
     cropImage.src = payload.crop_image;
     maskImage.src = payload.mask_image;
     renderResults(payload.results);
-    setStatus(`Found ${payload.results.length} similar items.`);
+    setStatus(`Найдено похожих товаров: ${payload.results.length}.`);
   } catch (error) {
-    setStatus(error.message);
+    setStatus(friendlyErrorMessage(error.message));
   }
 });
 
@@ -112,7 +145,7 @@ catalogForm.addEventListener('submit', async (event) => {
   const submitButton = catalogForm.querySelector('button[type="submit"]');
 
   if (!files.length) {
-    setCatalogStatus('Choose at least one catalog photo.');
+    setCatalogStatus('Выберите хотя бы одно изображение каталога.');
     return;
   }
 
@@ -138,24 +171,30 @@ catalogForm.addEventListener('submit', async (event) => {
         formData.append('price', price);
       }
 
-      setCatalogStatus(`Indexing ${index + 1}/${files.length}: ${file.name}`);
+      setCatalogStatus(`Индексация ${index + 1}/${files.length}: ${file.name}`);
       const response = await fetch('/catalog/add', {
         method: 'POST',
         body: formData,
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.detail || `Failed to index ${file.name}`);
+        throw new Error(
+          payload.detail || `Не удалось проиндексировать файл ${file.name}`,
+        );
       }
 
       indexedCount += 1;
-      appendCatalogLog(`Indexed ${payload.item_id} as ${payload.category}`);
+      appendCatalogLog(
+        `Проиндексировано: ${payload.item_id} (${categoryLabel(payload.category)})`,
+      );
     }
-    setCatalogStatus(`Indexed ${indexedCount} catalog image(s).`);
+    setCatalogStatus(`Проиндексировано изображений: ${indexedCount}.`);
     catalogForm.reset();
   } catch (error) {
-    appendCatalogLog(error.message, true);
-    setCatalogStatus(`Stopped after ${indexedCount}/${files.length} image(s).`);
+    appendCatalogLog(friendlyErrorMessage(error.message), true);
+    setCatalogStatus(
+      `Остановлено после ${indexedCount}/${files.length} изображений.`,
+    );
   } finally {
     submitButton.disabled = false;
   }

@@ -263,7 +263,14 @@ def test_index_page_renders_upload_form(tmp_path: Path) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
+    assert '<html lang="ru">' in response.text
     assert "ClothLens" in response.text
+    assert "Визуальный поиск одежды" in response.text
+    assert "Найти похожую одежду" in response.text
+    assert "Добавить изображения в каталог" in response.text
+    assert "Результаты" in response.text
+    assert "Visual clothing search" not in response.text
+    assert "Search Similar Clothes" not in response.text
     assert 'id="search-form"' in response.text
     assert 'name="file"' in response.text
     assert 'name="category"' in response.text
@@ -284,6 +291,11 @@ def test_static_assets_are_served(tmp_path: Path) -> None:
     assert "fetch('/search'" in script.text
     assert "fetch('/catalog/add'" in script.text
     assert "catalog-form" in script.text
+    assert "Идёт поиск..." in script.text
+    assert "Сходство:" in script.text
+    assert "Проиндексировано" in script.text
+    assert "Searching..." not in script.text
+    assert "Score:" not in script.text
     assert styles.status_code == 200
     assert ".result-card" in styles.text
 

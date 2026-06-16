@@ -1,4 +1,5 @@
 """FastAPI application factory."""
+# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -27,6 +28,15 @@ from clothing_search.segmentation.crop import CategoryNotFoundError
 
 SAFE_ITEM_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 API_DIR = Path(__file__).resolve().parent
+CATEGORY_LABELS = {
+    "top": "Верх: футболки, рубашки, блузки",
+    "bottom": "Низ: брюки, джинсы, юбки",
+    "dress": "Платье",
+    "outerwear": "Верхняя одежда",
+    "shoes": "Обувь",
+    "bag": "Сумка",
+    "accessories": "Аксессуары",
+}
 
 
 async def _read_upload_image(file: UploadFile) -> Image.Image:
@@ -128,11 +138,19 @@ def create_app(
             for category in ClothingCategory
             if category is not ClothingCategory.BACKGROUND
         ]
+        category_options = [
+            {
+                "value": category,
+                "label": CATEGORY_LABELS.get(category, category),
+            }
+            for category in categories
+        ]
         return templates.TemplateResponse(
             name="index.html",
             request=request,
             context={
                 "categories": categories,
+                "category_options": category_options,
                 "default_top_k": getattr(app.state.pipeline, "default_top_k", 10),
             },
         )
