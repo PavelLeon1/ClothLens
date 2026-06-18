@@ -3,6 +3,7 @@ from typing import Any
 from clothing_search.segmentation.transforms import (
     IMAGENET_MEAN,
     IMAGENET_STD,
+    MaskLongTransform,
     build_train_transform,
     build_validation_transform,
 )
@@ -39,12 +40,30 @@ class FakeToTensor:
         return "ToTensorV2", {}
 
 
+class FakeMaskTensor:
+    def __init__(self) -> None:
+        self.cast_to_long = False
+
+    def long(self) -> "FakeMaskTensor":
+        self.cast_to_long = True
+        return self
+
+
+class FakeCallableTransform:
+    def __init__(self, mask: FakeMaskTensor) -> None:
+        self.mask = mask
+
+    def __call__(self, **kwargs: Any) -> dict[str, Any]:
+        return {"image": kwargs["image"], "mask": self.mask}
+
+
 def test_train_transform_resizes_augments_normalizes_and_tensorizes() -> None:
-    operations = build_train_transform(
+    transform = build_train_transform(
         image_size=256,
         albumentations_module=FakeAlbumentations,
         to_tensor_cls=FakeToTensor,
     )
+    operations = transform.transform
 
     assert [operation[0] for operation in operations] == [
         "Resize",
@@ -59,14 +78,27 @@ def test_train_transform_resizes_augments_normalizes_and_tensorizes() -> None:
 
 
 def test_validation_transform_is_deterministic() -> None:
-    operations = build_validation_transform(
+    transform = build_validation_transform(
         image_size=512,
         albumentations_module=FakeAlbumentations,
         to_tensor_cls=FakeToTensor,
     )
+    operations = transform.transform
 
     assert [operation[0] for operation in operations] == [
         "Resize",
         "Normalize",
         "ToTensorV2",
     ]
+
+
+def test_mask_long_transform_casts_tensor_mask_to_long() -> None:
+    mask = FakeMaskTensor()
+    transform = MaskLongTransform(FakeCallableTransform(mask))
+    transformed = transform(
+        image="image",
+        mask="mask",
+    )
+
+    assert transformed["mask"] is mask
+    assert mask.cast_to_long is True

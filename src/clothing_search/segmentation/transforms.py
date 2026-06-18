@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+
+
+@dataclass(frozen=True, slots=True)
+class MaskLongTransform:
+    transform: Any
+
+    def __call__(self, **kwargs: Any) -> dict[str, Any]:
+        transformed = self.transform(**kwargs)
+        mask = transformed.get("mask")
+        if hasattr(mask, "long"):
+            transformed["mask"] = mask.long()
+        return transformed
 
 
 def _resolve_transform_dependencies(
@@ -46,19 +59,21 @@ def build_train_transform(
         albumentations_module,
         to_tensor_cls,
     )
-    return augmentations.Compose(
-        [
-            augmentations.Resize(height=image_size, width=image_size),
-            augmentations.HorizontalFlip(p=0.5),
-            augmentations.ColorJitter(
-                brightness=0.3,
-                contrast=0.3,
-                saturation=0.2,
-                p=0.5,
-            ),
-            augmentations.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            tensor_transform(),
-        ]
+    return MaskLongTransform(
+        augmentations.Compose(
+            [
+                augmentations.Resize(height=image_size, width=image_size),
+                augmentations.HorizontalFlip(p=0.5),
+                augmentations.ColorJitter(
+                    brightness=0.3,
+                    contrast=0.3,
+                    saturation=0.2,
+                    p=0.5,
+                ),
+                augmentations.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                tensor_transform(),
+            ]
+        )
     )
 
 
@@ -72,10 +87,12 @@ def build_validation_transform(
         albumentations_module,
         to_tensor_cls,
     )
-    return augmentations.Compose(
-        [
-            augmentations.Resize(height=image_size, width=image_size),
-            augmentations.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-            tensor_transform(),
-        ]
+    return MaskLongTransform(
+        augmentations.Compose(
+            [
+                augmentations.Resize(height=image_size, width=image_size),
+                augmentations.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+                tensor_transform(),
+            ]
+        )
     )

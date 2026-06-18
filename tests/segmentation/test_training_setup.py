@@ -14,8 +14,10 @@ class FakeLoss:
     def __init__(self, value: float, **settings: Any) -> None:
         self.value = value
         self.settings = settings
+        self.received_target: object | None = None
 
     def __call__(self, logits: object, target: object) -> float:
+        self.received_target = target
         return self.value
 
 
@@ -62,10 +64,32 @@ class FakeModel:
         return ["weight"]
 
 
+class FakeTarget:
+    def __init__(self) -> None:
+        self.cast_to_long = False
+
+    def long(self) -> "FakeTarget":
+        self.cast_to_long = True
+        return self
+
+
 def test_combined_loss_adds_dice_and_cross_entropy() -> None:
     loss = CombinedLoss(FakeLoss(0.25), FakeLoss(0.75))
 
     assert loss(object(), object()) == 1.0
+
+
+def test_combined_loss_casts_target_to_long() -> None:
+    primary = FakeLoss(0.25)
+    secondary = FakeLoss(0.75)
+    loss = CombinedLoss(primary, secondary)
+    target = FakeTarget()
+
+    loss(object(), target)
+
+    assert target.cast_to_long is True
+    assert primary.received_target is target
+    assert secondary.received_target is target
 
 
 def test_training_components_follow_yaml_settings(tmp_path: Path) -> None:

@@ -29,6 +29,8 @@ class CombinedLoss:
     secondary: Any
 
     def __call__(self, logits: Any, target: Any) -> Any:
+        if hasattr(target, "long"):
+            target = target.long()
         return self.primary(logits, target) + self.secondary(logits, target)
 
 
