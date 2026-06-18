@@ -75,3 +75,13 @@ def test_training_config_loads_runtime_logging_fields(tmp_path: Path) -> None:
     assert config.trainer.progress_refresh_rate == 2
     assert config.trainer.gradient_clip_val == 1.0
     assert config.trainer.save_last is True
+
+
+def test_gpu_training_configs_use_transferable_subset() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+
+    rtx_config = load_training_config(project_root / "configs" / "train_rtx5070.yaml")
+    t4_config = load_training_config(project_root / "configs" / "train_t4.yaml")
+
+    assert rtx_config.data.root == "data/raw/DeepFashion2_subset"
+    assert t4_config.data.root == "data/raw/DeepFashion2_subset"

@@ -14,6 +14,8 @@
 - Скрипты установки окружения:
   - `scripts/setup_training_env.ps1`
   - `scripts/setup_training_env.sh`
+- Подготовка переносимой подвыборки:
+  - `scripts/prepare_deepfashion2_subset.py`
 - Сравнение отчётов:
   - `baselines/segformer_demo_report.json`
   - `scripts/compare_search_reports.py`
@@ -32,8 +34,47 @@ data/raw/DeepFashion2/
     +-- annos/
 ```
 
-В Git датасет не добавляется. На домашнем ПК и сервере его нужно положить
-отдельно в эту же структуру.
+В Git датасет не добавляется. Полный DeepFashion2 лучше скачать только на
+домашний ПК, где есть место и RTX 5070. Для обучения в этом проекте по
+умолчанию используется уменьшенная переносимая подвыборка:
+
+```text
+data/raw/DeepFashion2_subset/
++-- train/
+|   +-- image/
+|   +-- annos/
++-- validation/
+    +-- image/
+    +-- annos/
+```
+
+Конфиги `configs/train_rtx5070.yaml` и `configs/train_t4.yaml` уже указывают
+на `data/raw/DeepFashion2_subset`.
+
+Чтобы создать такую подвыборку из полного датасета на домашнем ПК:
+
+```powershell
+python scripts\prepare_deepfashion2_subset.py `
+  --source data\raw\DeepFashion2 `
+  --output data\raw\DeepFashion2_subset `
+  --train-size 30000 `
+  --validation-size 5000 `
+  --archive data\raw\DeepFashion2_subset.zip `
+  --clean
+```
+
+Скрипт копирует пары `image/*.jpg` + `annos/*.json`, балансирует выборку по
+категориям `top`, `bottom`, `dress`, `outerwear` и пишет
+`subset_manifest.json`. На сервер T4 можно перенести только
+`DeepFashion2_subset.zip`, распаковать его в `data/raw/`, а полный датасет туда
+не переносить.
+
+Если на домашнем ПК жалко место на вторую копию картинок, добавь
+`--mode hardlink`. Папка subset будет занимать меньше места на этом же диске, а
+zip-архив всё равно получится обычным самостоятельным архивом.
+
+Если нужно обучать на полном DeepFashion2, поменяй в конфиге `data.root` назад
+на `data/raw/DeepFashion2`.
 
 DeepFashion2 в проекте используется только для категорий:
 
@@ -82,8 +123,18 @@ venv\Scripts\python.exe -m clothing_search.segmentation.train `
 
 ## 4. NVIDIA T4, Linux-сервер
 
-Если репозиторий переносится zip-файлом, распакуй его на сервере, положи
-DeepFashion2 в `data/raw/DeepFashion2`, затем:
+Если репозиторий переносится zip-файлом, распакуй его на сервере. Затем перенеси
+`DeepFashion2_subset.zip`, созданный на домашнем ПК, и распакуй его так, чтобы
+получилось:
+
+```text
+data/raw/DeepFashion2_subset/train/image/
+data/raw/DeepFashion2_subset/train/annos/
+data/raw/DeepFashion2_subset/validation/image/
+data/raw/DeepFashion2_subset/validation/annos/
+```
+
+После этого настрой окружение:
 
 ```bash
 bash scripts/setup_training_env.sh t4

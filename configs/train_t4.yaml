@@ -5,7 +5,7 @@ model:
   in_channels: 3
 
 data:
-  root: data/raw/DeepFashion2
+  root: data/raw/DeepFashion2_subset
   image_size: 512
   batch_size: 8
   num_workers: 4
