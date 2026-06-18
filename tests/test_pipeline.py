@@ -13,16 +13,23 @@ from clothing_search.segmentation.categories import ClothingCategory
 
 
 class FakeSegmenter:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        category: ClothingCategory = ClothingCategory.TOP,
+        score: float = 0.88,
+    ) -> None:
         self.image: Image.Image | None = None
+        self.category = category
+        self.score = score
 
     def segment(self, image: Image.Image) -> SegmentationResult:
         self.image = image
         mask = np.zeros((image.height, image.width), dtype=np.uint8)
-        mask[2:6, 1:5] = ClothingCategory.TOP
+        mask[2:6, 1:5] = self.category
         return SegmentationResult(
             mask=mask,
-            scores={ClothingCategory.TOP: 0.88},
+            scores={self.category: self.score},
         )
 
 
@@ -83,7 +90,87 @@ def test_pipeline_runs_segmentation_crop_embedding_and_search() -> None:
     assert response.category is ClothingCategory.TOP
     assert response.crop.box == (1, 2, 5, 6)
     assert response.segmentation_score == 0.88
+    assert response.segmentation_mode == "segformer"
+    assert response.segmentation_backend == "segformer"
     assert response.results[0].item_id == "sku-1"
+
+
+def test_pipeline_hybrid_uses_unet_for_trained_categories() -> None:
+    segformer = FakeSegmenter(category=ClothingCategory.TOP, score=0.25)
+    unet = FakeSegmenter(category=ClothingCategory.TOP, score=0.91)
+    pipeline = SearchPipeline(
+        segmenter=segformer,
+        unet_segmenter=unet,
+        encoder=FakeEncoder(),
+        store=FakeStore(),
+    )
+
+    response = pipeline.search(
+        Image.new("RGB", (8, 8)),
+        category="top",
+        segmentation_mode="hybrid",
+        padding_ratio=0,
+    )
+
+    assert segformer.image is None
+    assert unet.image is not None
+    assert response.segmentation_mode == "hybrid"
+    assert response.segmentation_backend == "unet"
+    assert response.segmentation_score == 0.91
+
+
+def test_pipeline_hybrid_falls_back_to_segformer_for_other_categories() -> None:
+    segformer = FakeSegmenter(category=ClothingCategory.SHOES, score=0.77)
+    unet = FakeSegmenter(category=ClothingCategory.SHOES, score=0.91)
+    pipeline = SearchPipeline(
+        segmenter=segformer,
+        unet_segmenter=unet,
+        encoder=FakeEncoder(),
+        store=FakeStore(),
+    )
+
+    response = pipeline.search(
+        Image.new("RGB", (8, 8)),
+        category="shoes",
+        segmentation_mode="hybrid",
+        padding_ratio=0,
+    )
+
+    assert segformer.image is not None
+    assert unet.image is None
+    assert response.segmentation_mode == "hybrid"
+    assert response.segmentation_backend == "segformer"
+    assert response.segmentation_score == 0.77
+
+
+def test_pipeline_rejects_unknown_segmentation_mode() -> None:
+    pipeline = SearchPipeline(
+        segmenter=FakeSegmenter(),
+        encoder=FakeEncoder(),
+        store=FakeStore(),
+    )
+
+    with pytest.raises(ValueError, match="Unsupported segmentation mode"):
+        pipeline.search(
+            Image.new("RGB", (8, 8)),
+            category="top",
+            segmentation_mode="unknown",
+        )
+
+
+def test_pipeline_rejects_unet_mode_without_unet_segmenter() -> None:
+    pipeline = SearchPipeline(
+        segmenter=FakeSegmenter(),
+        encoder=FakeEncoder(),
+        store=FakeStore(),
+    )
+
+    with pytest.raises(RuntimeError, match="U-Net segmentation mode requires U-Net"):
+        pipeline.search(
+            Image.new("RGB", (8, 8)),
+            category="top",
+            segmentation_mode="unet",
+        )
 
 
 def test_pipeline_uses_default_top_k() -> None:
@@ -211,3 +298,52 @@ def test_build_search_pipeline_uses_unet_backend(tmp_path: Path) -> None:
         "num_classes": 8,
     }
     assert pipeline.default_top_k == 5
+
+
+def test_build_search_pipeline_prepares_lazy_hybrid_backend(tmp_path: Path) -> None:
+    config_path = tmp_path / "app_hybrid.yaml"
+    config_path.write_text(
+        "segmentation:\n"
+        "  backend: segformer\n"
+        "  model_name: example/segformer\n"
+        "  checkpoint_path: models/unet_best.ckpt\n"
+        "embedding:\n"
+        "  model_name: example/fashion-clip\n"
+        "search:\n"
+        "  collection_name: example_catalog\n"
+        "  path: example/qdrant\n"
+        "  vector_size: 3\n",
+        encoding="utf-8",
+    )
+    config = load_app_config(config_path)
+    segformer = FakeSegmenter(category=ClothingCategory.TOP, score=0.25)
+    unet = FakeSegmenter(category=ClothingCategory.TOP, score=0.91)
+    unet_segmenter_factory = CaptureFactory(unet)
+
+    pipeline = build_search_pipeline(
+        config,
+        segmenter_factory=CaptureFactory(segformer),
+        unet_segmenter_factory=unet_segmenter_factory,
+        encoder_factory=CaptureFactory(FakeEncoder()),
+        store_factory=CaptureFactory(FakeStore()),
+    )
+
+    assert pipeline.supported_segmentation_modes == ("segformer", "hybrid")
+    assert unet_segmenter_factory.kwargs is None
+
+    response = pipeline.search(
+        Image.new("RGB", (8, 8)),
+        category="top",
+        segmentation_mode="hybrid",
+        padding_ratio=0,
+    )
+
+    assert response.segmentation_backend == "unet"
+    assert response.segmentation_score == 0.91
+    assert unet_segmenter_factory.kwargs == {
+        "checkpoint_path": "models/unet_best.ckpt",
+        "image_size": 512,
+        "encoder_name": "resnet34",
+        "encoder_weights": None,
+        "num_classes": 8,
+    }

@@ -33,6 +33,14 @@
               {% endfor %}
             </select>
           </label>
+          <label class="form-field">
+            Режим сегментации
+            <select name="segmentation_mode">
+              {% for mode in segmentation_mode_options %}
+              <option value="{{ mode.value }}"{% if mode.value == default_segmentation_mode %} selected{% endif %}>{{ mode.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label class="form-field compact-field">
             Количество результатов
             <input name="top_k" type="number" min="1" max="50" value="{{ default_top_k }}">

@@ -63,9 +63,10 @@ h2 {
 
 .search-form-grid {
   grid-template-columns:
-    minmax(260px, 2fr)
-    minmax(250px, 1.5fr)
-    minmax(150px, 0.7fr)
+    minmax(230px, 1.7fr)
+    minmax(220px, 1.2fr)
+    minmax(260px, 1.4fr)
+    minmax(150px, 0.6fr)
     minmax(220px, auto);
 }
 

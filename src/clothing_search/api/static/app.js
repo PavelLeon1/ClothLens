@@ -19,12 +19,22 @@ const CATEGORY_LABELS = {
   accessories: 'аксессуары',
 };
 
+const SEGMENTATION_BACKEND_LABELS = {
+  segformer: 'SegFormer',
+  unet: 'U-Net',
+  hybrid: 'гибридный режим',
+};
+
 function setStatus(message) {
   statusBox.textContent = message;
 }
 
 function categoryLabel(value) {
   return CATEGORY_LABELS[value] || value || 'неизвестно';
+}
+
+function segmentationLabel(value) {
+  return SEGMENTATION_BACKEND_LABELS[value] || value || 'неизвестно';
 }
 
 function friendlyErrorMessage(message) {
@@ -144,7 +154,10 @@ searchForm.addEventListener('submit', async (event) => {
 
     showPreview(payload.crop_image, payload.mask_image);
     renderResults(payload.results);
-    setStatus(`Найдено похожих товаров: ${payload.results.length}.`);
+    setStatus(
+      `Найдено похожих товаров: ${payload.results.length}. ` +
+      `Сегментатор: ${segmentationLabel(payload.segmentation_backend)}.`,
+    );
   } catch (error) {
     setStatus(friendlyErrorMessage(error.message));
   }

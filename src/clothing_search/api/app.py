@@ -18,6 +18,9 @@ from PIL import Image, UnidentifiedImageError
 from clothing_search.api.imaging import image_to_data_uri, mask_to_data_uri
 from clothing_search.config import load_app_config
 from clothing_search.pipeline import (
+    HYBRID_MODE,
+    SEGFORMER_MODE,
+    UNET_MODE,
     SearchPipeline,
     SearchResponse,
     build_search_pipeline,
@@ -36,6 +39,11 @@ CATEGORY_LABELS = {
     "shoes": "Обувь",
     "bag": "Сумка",
     "accessories": "Аксессуары",
+}
+SEGMENTATION_MODE_LABELS = {
+    SEGFORMER_MODE: "SegFormer для всех категорий",
+    HYBRID_MODE: "Гибрид: U-Net для 4 классов, SegFormer для остальных",
+    UNET_MODE: "U-Net",
 }
 
 
@@ -63,6 +71,8 @@ def _serialize_search_response(response: SearchResponse) -> dict[str, Any]:
     return {
         "category": response.category.name.lower(),
         "segmentation_score": response.segmentation_score,
+        "segmentation_mode": response.segmentation_mode,
+        "segmentation_backend": response.segmentation_backend,
         "crop_box": list(response.crop.box),
         "crop_image": image_to_data_uri(response.crop.image),
         "mask_image": mask_to_data_uri(response.mask),
@@ -151,6 +161,22 @@ def create_app(
             context={
                 "categories": categories,
                 "category_options": category_options,
+                "segmentation_mode_options": [
+                    {
+                        "value": mode,
+                        "label": SEGMENTATION_MODE_LABELS.get(mode, mode),
+                    }
+                    for mode in getattr(
+                        app.state.pipeline,
+                        "supported_segmentation_modes",
+                        (SEGFORMER_MODE,),
+                    )
+                ],
+                "default_segmentation_mode": getattr(
+                    app.state.pipeline,
+                    "default_segmentation_mode",
+                    SEGFORMER_MODE,
+                ),
                 "default_top_k": getattr(app.state.pipeline, "default_top_k", 10),
             },
         )
@@ -164,6 +190,7 @@ def create_app(
         file: Annotated[UploadFile, File()],
         category: Annotated[str, Form()],
         top_k: Annotated[int | None, Form()] = None,
+        segmentation_mode: Annotated[str | None, Form()] = None,
     ) -> dict[str, Any]:
         image = await _read_upload_image(file)
         try:
@@ -171,11 +198,14 @@ def create_app(
                 image,
                 category=category,
                 top_k=top_k,
+                segmentation_mode=segmentation_mode,
             )
         except CategoryNotFoundError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        except (OSError, RuntimeError) as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
         return _serialize_search_response(response)
 
     @app.post("/catalog/add")

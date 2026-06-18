@@ -45,9 +45,11 @@ class FakeStore:
 
 class FakePipeline:
     def __init__(self) -> None:
-        self.calls: list[tuple[Image.Image, str, int | None]] = []
+        self.calls: list[tuple[Image.Image, str, int | None, str | None]] = []
         self.encoder = FakeEncoder()
         self.store = FakeStore()
+        self.default_segmentation_mode = "segformer"
+        self.supported_segmentation_modes = ("segformer", "hybrid")
 
     def search(
         self,
@@ -55,12 +57,15 @@ class FakePipeline:
         *,
         category: str,
         top_k: int | None = None,
+        segmentation_mode: str | None = None,
     ) -> SearchResponse:
-        self.calls.append((image, category, top_k))
+        self.calls.append((image, category, top_k, segmentation_mode))
         if category == "unknown":
             raise ValueError("Unsupported clothing category: unknown")
         if category == "dress":
             raise CategoryNotFoundError("Clothing category 'dress' was not found")
+        if category == "bag":
+            raise RuntimeError("U-Net checkpoint is not available")
 
         mask = np.zeros((image.height, image.width), dtype=np.uint8)
         mask[1:3, 2:5] = ClothingCategory.TOP
@@ -74,6 +79,10 @@ class FakePipeline:
             mask=mask,
             crop=crop,
             segmentation_score=0.91,
+            segmentation_mode=segmentation_mode or "segformer",
+            segmentation_backend=(
+                "unet" if segmentation_mode == "hybrid" else "segformer"
+            ),
             results=[
                 SearchResult(
                     item_id="sku-1",
@@ -109,13 +118,15 @@ def test_search_returns_serialized_crop_mask_and_results(tmp_path: Path) -> None
     response = client.post(
         "/search",
         files={"file": ("query.png", image_bytes(), "image/png")},
-        data={"category": "top", "top_k": "3"},
+        data={"category": "top", "top_k": "3", "segmentation_mode": "hybrid"},
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["category"] == "top"
     assert payload["segmentation_score"] == 0.91
+    assert payload["segmentation_mode"] == "hybrid"
+    assert payload["segmentation_backend"] == "unet"
     assert payload["crop_box"] == [2, 1, 5, 3]
     assert payload["crop_image"].startswith("data:image/png;base64,")
     assert payload["mask_image"].startswith("data:image/png;base64,")
@@ -130,7 +141,7 @@ def test_search_returns_serialized_crop_mask_and_results(tmp_path: Path) -> None
             },
         }
     ]
-    assert pipeline.calls[0][1:] == ("top", 3)
+    assert pipeline.calls[0][1:] == ("top", 3, "hybrid")
 
 
 def test_search_rejects_invalid_image(tmp_path: Path) -> None:
@@ -164,6 +175,21 @@ def test_search_maps_domain_errors_to_http_errors(tmp_path: Path) -> None:
     assert "Unsupported clothing category" in invalid.json()["detail"]
     assert missing.status_code == 404
     assert "was not found" in missing.json()["detail"]
+
+
+def test_search_maps_model_loading_errors_to_service_unavailable(
+    tmp_path: Path,
+) -> None:
+    client, _ = make_client(tmp_path)
+
+    response = client.post(
+        "/search",
+        files={"file": ("query.png", image_bytes(), "image/png")},
+        data={"category": "bag", "segmentation_mode": "hybrid"},
+    )
+
+    assert response.status_code == 503
+    assert "checkpoint" in response.json()["detail"]
 
 
 def test_catalog_add_saves_image_and_indexes_metadata(tmp_path: Path) -> None:
@@ -274,6 +300,9 @@ def test_index_page_renders_upload_form(tmp_path: Path) -> None:
     assert 'id="search-form" class="form-grid search-form-grid"' in response.text
     assert 'name="file"' in response.text
     assert 'name="category"' in response.text
+    assert 'name="segmentation_mode"' in response.text
+    assert "SegFormer" in response.text
+    assert "U-Net" in response.text
     assert 'id="catalog-form" class="form-grid catalog-form-grid"' in response.text
     assert 'name="catalog_files"' in response.text
     assert 'multiple' in response.text
@@ -294,6 +323,8 @@ def test_static_assets_are_served(tmp_path: Path) -> None:
     assert script.status_code == 200
     assert "fetch('/search'" in script.text
     assert "fetch('/catalog/add'" in script.text
+    assert "SEGMENTATION_BACKEND_LABELS" in script.text
+    assert "segmentation_backend" in script.text
     assert "catalog-form" in script.text
     assert "Идёт поиск..." in script.text
     assert "Сходство:" in script.text

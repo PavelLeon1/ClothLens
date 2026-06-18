@@ -1,7 +1,12 @@
 segmentation:
   backend: segformer
   model_name: mattmdjaga/segformer_b2_clothes
-  checkpoint_path: null
+  checkpoint_path: models/unet_best.ckpt
+  image_size: 512
+  encoder: resnet34
+  encoder_weights: null
+  num_classes: 8
+  in_channels: 3
 
 embedding:
   model_name: patrickjohncyh/fashion-clip

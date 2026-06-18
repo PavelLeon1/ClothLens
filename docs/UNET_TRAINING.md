@@ -20,6 +20,15 @@
   - `baselines/segformer_demo_report.json`
   - `scripts/compare_search_reports.py`
 
+Полученный результат обучения на RTX 5070:
+
+- train subset: 30 000 изображений;
+- validation subset: 5 000 изображений;
+- лучший checkpoint: `unet_rtx5070_best.ckpt`;
+- лучшая эпоха: 17;
+- `val_miou`: 0.7342;
+- финальный `val_miou`: 0.7337.
+
 ## 2. Датасет
 
 Ожидаемая структура DeepFashion2:
@@ -237,6 +246,10 @@ venv\Scripts\python.exe -m clothing_search.segmentation.train `
 ```text
 models/unet_best.ckpt
 ```
+
+В обычном приложении `configs/app.yaml` этот же checkpoint используется для
+гибридного режима: U-Net обрабатывает `top`, `bottom`, `dress`, `outerwear`, а
+SegFormer остаётся для остальных категорий.
 
 Построй или перенеси индекс каталога `data/qdrant`, затем запусти evaluation:
 
