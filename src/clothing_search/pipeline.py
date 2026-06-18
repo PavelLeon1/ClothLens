@@ -106,18 +106,35 @@ class SearchPipeline:
 def build_search_pipeline(
     config: AppConfig,
     *,
-    segmenter_factory: Callable[..., Any] = SegFormerSegmenter,
+    segmenter_factory: Callable[..., Any] | None = None,
+    unet_segmenter_factory: Callable[..., Any] | None = None,
     encoder_factory: Callable[..., Any] = FashionEncoder,
     store_factory: Callable[..., Any] = QdrantStore,
 ) -> SearchPipeline:
-    if config.segmentation.backend != "segformer":
+    if config.segmentation.backend == "segformer":
+        resolved_segmenter_factory = segmenter_factory or SegFormerSegmenter
+        segmenter = resolved_segmenter_factory(config.segmentation.model_name)
+    elif config.segmentation.backend == "unet":
+        if not config.segmentation.checkpoint_path:
+            raise RuntimeError("U-Net backend requires segmentation.checkpoint_path")
+        if unet_segmenter_factory is None:
+            from clothing_search.segmentation.unet_segmenter import UnetSegmenter
+
+            unet_segmenter_factory = UnetSegmenter
+        segmenter = unet_segmenter_factory(
+            checkpoint_path=config.segmentation.checkpoint_path,
+            image_size=config.segmentation.image_size,
+            encoder_name=config.segmentation.encoder,
+            encoder_weights=config.segmentation.encoder_weights,
+            num_classes=config.segmentation.num_classes,
+        )
+    else:
         raise RuntimeError(
-            "The U-Net inference backend requires a trained checkpoint and "
-            "will be connected after model training."
+            f"Unsupported segmentation backend: {config.segmentation.backend}"
         )
 
     return SearchPipeline(
-        segmenter=segmenter_factory(config.segmentation.model_name),
+        segmenter=segmenter,
         encoder=encoder_factory(config.embedding.model_name),
         store=store_factory(
             collection_name=config.search.collection_name,

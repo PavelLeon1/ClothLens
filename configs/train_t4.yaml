@@ -7,7 +7,7 @@ model:
 data:
   root: data/raw/DeepFashion2
   image_size: 512
-  batch_size: 16
+  batch_size: 8
   num_workers: 4
 
 optimizer:
@@ -18,11 +18,11 @@ trainer:
   max_epochs: 20
   early_stopping_patience: 5
   precision: 16-mixed
-  checkpoint_path: models/unet_best.ckpt
-  accelerator: auto
+  checkpoint_path: models/unet_t4_best.ckpt
+  accelerator: gpu
   devices: 1
   log_dir: results/training_logs
-  run_name: unet
+  run_name: unet_t4
   log_every_n_steps: 10
   progress_refresh_rate: 1
   gradient_clip_val: 1.0

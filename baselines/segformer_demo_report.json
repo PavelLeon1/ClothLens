@@ -1,0 +1,24 @@
+{
+  "name": "SegFormer demo baseline",
+  "source": "results/demo-segformer-report.json generated during Stage 4 demo evaluation",
+  "top_k": 2,
+  "query_count": 6,
+  "summary": {
+    "precision_at_k": 0.8333333333333334,
+    "recall_at_k": 0.8333333333333334,
+    "mean_average_precision_at_k": 0.8333333333333334,
+    "latency_seconds": {
+      "count": 6,
+      "min": 1.5472362,
+      "max": 1.9322545,
+      "mean": 1.7608955,
+      "p50": 1.7734804,
+      "p95": 1.9322545
+    }
+  },
+  "notes": [
+    "Synthetic demo catalog/query set, not a scientific benchmark.",
+    "One synthetic shoes query failed segmentation and was counted as zero metrics.",
+    "Use the same evaluation manifest and top_k when comparing with U-Net."
+  ]
+}

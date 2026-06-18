@@ -171,3 +171,43 @@ def test_build_search_pipeline_uses_application_config(tmp_path: Path) -> None:
         "vector_size": 3,
     }
     assert pipeline.default_top_k == 4
+
+
+def test_build_search_pipeline_uses_unet_backend(tmp_path: Path) -> None:
+    config_path = tmp_path / "app_unet.yaml"
+    config_path.write_text(
+        "segmentation:\n"
+        "  backend: unet\n"
+        "  checkpoint_path: models/unet_best.ckpt\n"
+        "  image_size: 512\n"
+        "embedding:\n"
+        "  model_name: example/fashion-clip\n"
+        "search:\n"
+        "  collection_name: example_catalog\n"
+        "  path: example/qdrant\n"
+        "  vector_size: 3\n"
+        "  top_k: 5\n",
+        encoding="utf-8",
+    )
+    config = load_app_config(config_path)
+    segmenter = FakeSegmenter()
+    encoder = FakeEncoder()
+    store = FakeStore()
+    unet_segmenter_factory = CaptureFactory(segmenter)
+
+    pipeline = build_search_pipeline(
+        config,
+        unet_segmenter_factory=unet_segmenter_factory,
+        encoder_factory=CaptureFactory(encoder),
+        store_factory=CaptureFactory(store),
+    )
+
+    assert pipeline.segmenter is segmenter
+    assert unet_segmenter_factory.kwargs == {
+        "checkpoint_path": "models/unet_best.ckpt",
+        "image_size": 512,
+        "encoder_name": "resnet34",
+        "encoder_weights": None,
+        "num_classes": 8,
+    }
+    assert pipeline.default_top_k == 5

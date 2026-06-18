@@ -16,6 +16,11 @@ class SegmentationConfig:
     backend: str = "segformer"
     model_name: str = "mattmdjaga/segformer_b2_clothes"
     checkpoint_path: str | None = None
+    image_size: int = 512
+    encoder: str = "resnet34"
+    encoder_weights: str | None = None
+    num_classes: int = 8
+    in_channels: int = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +72,17 @@ class TrainerConfig:
     early_stopping_patience: int = 5
     precision: str = "16-mixed"
     checkpoint_path: str = "models/unet_best.ckpt"
+    accelerator: str = "auto"
+    devices: int | str = 1
+    log_dir: str = "results/training_logs"
+    run_name: str = "unet"
+    log_every_n_steps: int = 10
+    progress_refresh_rate: int = 1
+    gradient_clip_val: float | None = 1.0
+    accumulate_grad_batches: int = 1
+    deterministic: bool = False
+    save_last: bool = True
+    resume_from_checkpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

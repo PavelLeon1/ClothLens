@@ -48,3 +48,30 @@ def test_training_config_keeps_defaults_for_unspecified_fields(
     assert config.model.encoder == "resnet34"
     assert config.data.image_size == 512
     assert config.trainer.max_epochs == 20
+
+
+def test_training_config_loads_runtime_logging_fields(tmp_path: Path) -> None:
+    path = tmp_path / "train.yaml"
+    path.write_text(
+        "trainer:\n"
+        "  accelerator: gpu\n"
+        "  devices: 1\n"
+        "  log_dir: results/training_logs\n"
+        "  run_name: unet_t4\n"
+        "  log_every_n_steps: 5\n"
+        "  progress_refresh_rate: 2\n"
+        "  gradient_clip_val: 1.0\n"
+        "  save_last: true\n",
+        encoding="utf-8",
+    )
+
+    config = load_training_config(path)
+
+    assert config.trainer.accelerator == "gpu"
+    assert config.trainer.devices == 1
+    assert config.trainer.log_dir == "results/training_logs"
+    assert config.trainer.run_name == "unet_t4"
+    assert config.trainer.log_every_n_steps == 5
+    assert config.trainer.progress_refresh_rate == 2
+    assert config.trainer.gradient_clip_val == 1.0
+    assert config.trainer.save_last is True

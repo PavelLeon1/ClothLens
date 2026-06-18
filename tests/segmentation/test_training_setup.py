@@ -6,6 +6,7 @@ from clothing_search.segmentation.train import (
     CombinedLoss,
     build_training_components,
     run_training,
+    summarize_training_run,
 )
 
 
@@ -95,6 +96,36 @@ def test_training_components_follow_yaml_settings(tmp_path: Path) -> None:
     }
     assert components.scheduler.optimizer is components.optimizer
     assert components.scheduler.settings == {"T_max": 12}
+
+
+def test_summarize_training_run_estimates_steps(tmp_path: Path) -> None:
+    path = tmp_path / "train.yaml"
+    path.write_text(
+        "data:\n"
+        "  batch_size: 8\n"
+        "trainer:\n"
+        "  max_epochs: 3\n",
+        encoding="utf-8",
+    )
+    config = load_training_config(path)
+
+    summary = summarize_training_run(
+        config,
+        train_size=25,
+        validation_size=10,
+    )
+
+    assert summary.to_dict() == {
+        "data_root": "data/raw/DeepFashion2",
+        "image_size": 512,
+        "batch_size": 8,
+        "train_size": 25,
+        "validation_size": 10,
+        "steps_per_epoch": 4,
+        "validation_steps": 2,
+        "total_train_steps": 12,
+        "max_epochs": 3,
+    }
 
 
 def test_run_training_reports_missing_ml_dependencies(
