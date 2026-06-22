@@ -19,12 +19,19 @@ from clothing_search.segmentation.categories import (
     ClothingCategory,
     category_from_name,
 )
-from clothing_search.segmentation.crop import CategoryCrop, crop_category
+from clothing_search.segmentation.crop import (
+    CategoryCrop,
+    crop_category,
+)
 from clothing_search.segmentation.segformer import SegFormerSegmenter
 
 SEGFORMER_MODE = "segformer"
 UNET_MODE = "unet"
 HYBRID_MODE = "hybrid"
+UNET_SELECTED_CATEGORY_TOO_SMALL = "unet_selected_category_too_small"
+UNET_CATEGORY_NOT_FOUND = "unet_category_not_found"
+UNET_MIN_CATEGORY_AREA_RATIO = 0.02
+UNET_MIN_CATEGORY_TO_LARGEST_AREA_RATIO = 0.15
 SUPPORTED_SEGMENTATION_MODES = frozenset({SEGFORMER_MODE, UNET_MODE, HYBRID_MODE})
 UNET_TRAINED_CATEGORIES = frozenset(
     {
@@ -61,6 +68,7 @@ class SearchResponse:
     results: list[SearchResult]
     segmentation_mode: str = SEGFORMER_MODE
     segmentation_backend: str = SEGFORMER_MODE
+    segmentation_fallback_reason: str | None = None
 
 
 class LazySegmenter:
@@ -73,6 +81,33 @@ class LazySegmenter:
         if self._segmenter is None:
             self._segmenter = self.factory(**self.kwargs)
         return self._segmenter.segment(image)
+
+
+def _hybrid_unet_fallback_reason(
+    mask: NDArray[np.integer],
+    category: ClothingCategory,
+) -> str | None:
+    category_pixels = int(np.count_nonzero(mask == int(category)))
+    if category_pixels == 0:
+        return UNET_CATEGORY_NOT_FOUND
+
+    image_pixels = int(mask.size)
+    if category_pixels / image_pixels < UNET_MIN_CATEGORY_AREA_RATIO:
+        return UNET_SELECTED_CATEGORY_TOO_SMALL
+
+    foreground = mask[mask != int(ClothingCategory.BACKGROUND)]
+    if foreground.size == 0:
+        return UNET_CATEGORY_NOT_FOUND
+    _, counts = np.unique(foreground, return_counts=True)
+    largest_category_pixels = int(counts.max())
+    if (
+        largest_category_pixels > 0
+        and category_pixels / largest_category_pixels
+        < UNET_MIN_CATEGORY_TO_LARGEST_AREA_RATIO
+    ):
+        return UNET_SELECTED_CATEGORY_TOO_SMALL
+
+    return None
 
 
 class SearchPipeline:
@@ -146,6 +181,15 @@ class SearchPipeline:
             segmentation_mode=segmentation_mode,
         )
         segmentation = segmenter.segment(image)
+        fallback_reason = None
+        if resolved_mode == HYBRID_MODE and backend == UNET_MODE:
+            fallback_reason = _hybrid_unet_fallback_reason(
+                segmentation.mask,
+                resolved_category,
+            )
+            if fallback_reason is not None:
+                segmentation = self.segmenter.segment(image)
+                backend = SEGFORMER_MODE
         crop = crop_category(
             image,
             segmentation.mask,
@@ -166,6 +210,7 @@ class SearchPipeline:
             results=results,
             segmentation_mode=resolved_mode,
             segmentation_backend=backend,
+            segmentation_fallback_reason=fallback_reason,
         )
 
 

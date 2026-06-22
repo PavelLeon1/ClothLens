@@ -80,8 +80,11 @@ class FakePipeline:
             crop=crop,
             segmentation_score=0.91,
             segmentation_mode=segmentation_mode or "segformer",
-            segmentation_backend=(
-                "unet" if segmentation_mode == "hybrid" else "segformer"
+            segmentation_backend="segformer",
+            segmentation_fallback_reason=(
+                "unet_selected_category_too_small"
+                if segmentation_mode == "hybrid"
+                else None
             ),
             results=[
                 SearchResult(
@@ -126,7 +129,10 @@ def test_search_returns_serialized_crop_mask_and_results(tmp_path: Path) -> None
     assert payload["category"] == "top"
     assert payload["segmentation_score"] == 0.91
     assert payload["segmentation_mode"] == "hybrid"
-    assert payload["segmentation_backend"] == "unet"
+    assert payload["segmentation_backend"] == "segformer"
+    assert payload["segmentation_fallback_reason"] == (
+        "unet_selected_category_too_small"
+    )
     assert payload["crop_box"] == [2, 1, 5, 3]
     assert payload["crop_image"].startswith("data:image/png;base64,")
     assert payload["mask_image"].startswith("data:image/png;base64,")
@@ -325,6 +331,7 @@ def test_static_assets_are_served(tmp_path: Path) -> None:
     assert "fetch('/catalog/add'" in script.text
     assert "SEGMENTATION_BACKEND_LABELS" in script.text
     assert "segmentation_backend" in script.text
+    assert "segmentation_fallback_reason" in script.text
     assert "catalog-form" in script.text
     assert "Идёт поиск..." in script.text
     assert "Сходство:" in script.text

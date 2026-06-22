@@ -33,6 +33,22 @@ class FakeSegmenter:
         )
 
 
+class MaskSegmenter:
+    def __init__(
+        self,
+        *,
+        mask: np.ndarray,
+        scores: dict[ClothingCategory, float],
+    ) -> None:
+        self.image: Image.Image | None = None
+        self.mask = mask
+        self.scores = scores
+
+    def segment(self, image: Image.Image) -> SegmentationResult:
+        self.image = image
+        return SegmentationResult(mask=self.mask, scores=self.scores)
+
+
 class FakeEncoder:
     def __init__(self) -> None:
         self.image: Image.Image | None = None
@@ -141,6 +157,80 @@ def test_pipeline_hybrid_falls_back_to_segformer_for_other_categories() -> None:
     assert response.segmentation_mode == "hybrid"
     assert response.segmentation_backend == "segformer"
     assert response.segmentation_score == 0.77
+
+
+def test_pipeline_hybrid_falls_back_when_unet_category_mask_is_tiny() -> None:
+    unet_mask = np.zeros((10, 10), dtype=np.uint8)
+    unet_mask[1:9, 1:9] = ClothingCategory.BOTTOM
+    unet_mask[0, 0] = ClothingCategory.TOP
+    segformer_mask = np.zeros((10, 10), dtype=np.uint8)
+    segformer_mask[1:8, 1:9] = ClothingCategory.TOP
+    unet = MaskSegmenter(
+        mask=unet_mask,
+        scores={ClothingCategory.TOP: 0.92, ClothingCategory.BOTTOM: 0.96},
+    )
+    segformer = MaskSegmenter(
+        mask=segformer_mask,
+        scores={ClothingCategory.TOP: 0.83},
+    )
+    encoder = FakeEncoder()
+    pipeline = SearchPipeline(
+        segmenter=segformer,
+        unet_segmenter=unet,
+        encoder=encoder,
+        store=FakeStore(),
+    )
+
+    response = pipeline.search(
+        Image.new("RGB", (10, 10)),
+        category="top",
+        segmentation_mode="hybrid",
+        padding_ratio=0,
+    )
+
+    assert unet.image is not None
+    assert segformer.image is not None
+    assert encoder.image is not None
+    assert encoder.image.size == (8, 7)
+    assert response.crop.box == (1, 1, 9, 8)
+    assert response.segmentation_mode == "hybrid"
+    assert response.segmentation_backend == "segformer"
+    assert response.segmentation_fallback_reason == "unet_selected_category_too_small"
+    assert response.segmentation_score == 0.83
+
+
+def test_pipeline_hybrid_falls_back_when_unet_misses_category() -> None:
+    unet_mask = np.zeros((10, 10), dtype=np.uint8)
+    unet_mask[1:9, 1:9] = ClothingCategory.BOTTOM
+    segformer_mask = np.zeros((10, 10), dtype=np.uint8)
+    segformer_mask[1:8, 1:9] = ClothingCategory.TOP
+    unet = MaskSegmenter(
+        mask=unet_mask,
+        scores={ClothingCategory.BOTTOM: 0.96},
+    )
+    segformer = MaskSegmenter(
+        mask=segformer_mask,
+        scores={ClothingCategory.TOP: 0.83},
+    )
+    pipeline = SearchPipeline(
+        segmenter=segformer,
+        unet_segmenter=unet,
+        encoder=FakeEncoder(),
+        store=FakeStore(),
+    )
+
+    response = pipeline.search(
+        Image.new("RGB", (10, 10)),
+        category="top",
+        segmentation_mode="hybrid",
+        padding_ratio=0,
+    )
+
+    assert unet.image is not None
+    assert segformer.image is not None
+    assert response.segmentation_backend == "segformer"
+    assert response.segmentation_fallback_reason == "unet_category_not_found"
+    assert response.crop.box == (1, 1, 9, 8)
 
 
 def test_pipeline_rejects_unknown_segmentation_mode() -> None:

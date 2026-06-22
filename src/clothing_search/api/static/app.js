@@ -25,6 +25,11 @@ const SEGMENTATION_BACKEND_LABELS = {
   hybrid: 'гибридный режим',
 };
 
+const SEGMENTATION_FALLBACK_LABELS = {
+  unet_selected_category_too_small: 'U-Net дал слишком маленькую область выбранного класса, поэтому использован SegFormer',
+  unet_category_not_found: 'U-Net не нашёл выбранную категорию, поэтому использован SegFormer',
+};
+
 function setStatus(message) {
   statusBox.textContent = message;
 }
@@ -35,6 +40,10 @@ function categoryLabel(value) {
 
 function segmentationLabel(value) {
   return SEGMENTATION_BACKEND_LABELS[value] || value || 'неизвестно';
+}
+
+function fallbackLabel(value) {
+  return SEGMENTATION_FALLBACK_LABELS[value] || value || '';
 }
 
 function friendlyErrorMessage(message) {
@@ -154,9 +163,13 @@ searchForm.addEventListener('submit', async (event) => {
 
     showPreview(payload.crop_image, payload.mask_image);
     renderResults(payload.results);
+    const fallbackMessage = payload.segmentation_fallback_reason
+      ? ` Автооткат: ${fallbackLabel(payload.segmentation_fallback_reason)}.`
+      : '';
     setStatus(
       `Найдено похожих товаров: ${payload.results.length}. ` +
-      `Сегментатор: ${segmentationLabel(payload.segmentation_backend)}.`,
+      `Сегментатор: ${segmentationLabel(payload.segmentation_backend)}.` +
+      fallbackMessage,
     );
   } catch (error) {
     setStatus(friendlyErrorMessage(error.message));

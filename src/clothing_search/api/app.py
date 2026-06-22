@@ -73,6 +73,7 @@ def _serialize_search_response(response: SearchResponse) -> dict[str, Any]:
         "segmentation_score": response.segmentation_score,
         "segmentation_mode": response.segmentation_mode,
         "segmentation_backend": response.segmentation_backend,
+        "segmentation_fallback_reason": response.segmentation_fallback_reason,
         "crop_box": list(response.crop.box),
         "crop_image": image_to_data_uri(response.crop.image),
         "mask_image": mask_to_data_uri(response.mask),
